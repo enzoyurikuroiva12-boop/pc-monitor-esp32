@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PC Monitor local agent. No cloud telemetry; unavailable sensors are explicit."""
 from __future__ import annotations
-import argparse, asyncio, json, logging, os, platform, socket, threading, time
+import argparse, asyncio, json, logging, os, platform, socket, threading, time, uuid, urllib.request, urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,10 @@ LATEST: dict[str, Any] = {}
 DEMO = False
 INTERVAL = 1.0
 SERIAL_PORT = None
+PRESENCE_URL = "https://lpbzjbnymyztshjxrbmc.supabase.co"
+PRESENCE_KEY = "sb_publishable_RtbKVnBA45ffDLbSGIU9lQ_pxgjHEpg"
+PRESENCE_ID = ""
+STARTED_AT = time.time()
 
 
 def unavailable(reason="Indisponível neste computador."):
@@ -81,6 +85,29 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass
 
 
+def presence_loop():
+    """Register/refresh minimal online presence; no hardware metrics are sent."""
+    global PRESENCE_ID
+    try:
+        path = Path.home() / ".pc-monitor-agent-id"
+        if path.exists(): PRESENCE_ID = path.read_text().strip()
+        if not PRESENCE_ID:
+            PRESENCE_ID = uuid.uuid4().hex + uuid.uuid4().hex
+            path.write_text(PRESENCE_ID)
+        payload = {"agent_id": PRESENCE_ID, "display_name": socket.gethostname(), "operating_system": f"{platform.system()} {platform.release()}", "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(STARTED_AT)), "last_seen": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "agent_version": "0.2.0"}
+        url = PRESENCE_URL.rstrip("/") + "/rest/v1/agent_presence"
+        while True:
+            payload["last_seen"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            data = json.dumps(payload).encode(); req = urllib.request.Request(url, data=data, method="POST", headers={"Content-Type":"application/json", "apikey":PRESENCE_KEY, "Authorization":"Bearer "+PRESENCE_KEY, "Prefer":"resolution=merge-duplicates"})
+            try:
+                urllib.request.urlopen(req, timeout=8).read()
+            except urllib.error.HTTPError as e:
+                if e.code not in (409,): LOG.debug("presence HTTP %s", e.code)
+            except Exception as e: LOG.debug("presence unavailable: %s", e)
+            time.sleep(15)
+    except Exception as e: LOG.warning("Presença desativada: %s", e)
+
+
 def serial_loop():
     if not SERIAL_PORT: return
     try:
@@ -92,13 +119,14 @@ def serial_loop():
 
 def main():
     global DEMO, INTERVAL, SERIAL_PORT, LATEST
-    ap = argparse.ArgumentParser(); ap.add_argument("--demo", action="store_true"); ap.add_argument("--port", type=int, default=8765); ap.add_argument("--interval", type=float, default=1); ap.add_argument("--serial"); args = ap.parse_args(); DEMO, INTERVAL, SERIAL_PORT = args.demo, max(.2,args.interval), args.serial
+    ap = argparse.ArgumentParser(); ap.add_argument("--demo", action="store_true"); ap.add_argument("--port", type=int, default=8765); ap.add_argument("--interval", type=float, default=1); ap.add_argument("--serial"); ap.add_argument("--no-presence", action="store_true", help="não registrar presença online"); args = ap.parse_args(); DEMO, INTERVAL, SERIAL_PORT = args.demo, max(.2,args.interval), args.serial
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     def updater():
         global LATEST
         while True:
             LATEST = collect(); time.sleep(INTERVAL)
-    threading.Thread(target=updater, daemon=True).start(); threading.Thread(target=serial_loop, daemon=True).start()
+    threading.Thread(target=updater, daemon=True).start(); threading.Thread(target=serial_loop, daemon=True).start();
+    if not args.no_presence: threading.Thread(target=presence_loop, daemon=True).start()
     LOG.info("PC Monitor em http://127.0.0.1:%s (%s)", args.port, "DEMO" if DEMO else "LOCAL")
     ThreadingHTTPServer(("0.0.0.0", args.port), Handler).serve_forever()
 if __name__ == "__main__": main()

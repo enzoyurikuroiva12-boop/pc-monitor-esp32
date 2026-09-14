@@ -53,3 +53,7 @@ CPU/RAM/discos/rede/processos são coletados sem inventar valores. Temperaturas 
 ## Licença
 
 MIT. Consulte `LICENSE`.
+
+## Dashboard de presença
+
+A dashboard hospedada em `/presence` mostra PCs registrados pelo agente, tempo desde o início e último heartbeat. O agente envia apenas presença mínima a cada 15 segundos; use `--no-presence` para desativar. O estado online expira após 30 segundos sem heartbeat.
