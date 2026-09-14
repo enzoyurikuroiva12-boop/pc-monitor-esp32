@@ -9,3 +9,5 @@ build/
 .pio/
 dist/*
 !dist/.gitkeep
+node_modules/
+.vercel/

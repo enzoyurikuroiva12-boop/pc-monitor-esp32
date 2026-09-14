@@ -57,3 +57,11 @@ MIT. Consulte `LICENSE`.
 ## Dashboard de presença
 
 A dashboard hospedada em `/presence` mostra PCs registrados pelo agente, tempo desde o início e último heartbeat. O agente envia apenas presença mínima a cada 15 segundos; use `--no-presence` para desativar. O estado online expira após 30 segundos sem heartbeat.
+
+## Acesso protegido na Vercel
+
+O site hospedado usa autenticação HTTP Basic no middleware da Vercel. A senha não fica no HTML, no JavaScript do navegador ou no Git; ela deve ser cadastrada como variável secreta no projeto da Vercel. Configure `SITE_USERNAME` como `pc-monitor` e `SITE_PASSWORD` como a senha escolhida (neste pedido, `210580`) nos ambientes **Production** e **Preview**. Sem `SITE_PASSWORD`, o middleware bloqueia todas as requisições.
+
+Para publicar, importe este repositório na Vercel, mantenha o diretório raiz como `/` e faça o deploy. Em **Settings → Environment Variables**, cadastre as duas variáveis sem aspas e faça um novo deploy após salvá-las. Não inclua a senha em `.env`, commits, issues ou mensagens públicas. O arquivo `.env.example` contém apenas os nomes esperados.
+
+A proteção cobre também os arquivos estáticos e aplica cabeçalhos de segurança. A integração local do agente continua funcionando em `http://127.0.0.1:8765`; a senha protege a cópia hospedada, não substitui a segurança da rede local.
