@@ -1,0 +1,11 @@
+agent/.venv/
+__pycache__/
+*.pyc
+*.log
+build/
+*.spec.bak
+.env
+.vscode/
+.pio/
+dist/*
+!dist/.gitkeep

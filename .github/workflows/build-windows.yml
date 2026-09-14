@@ -1,0 +1,27 @@
+name: Build Windows
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Install dependencies
+        run: pip install -r agent/requirements.txt
+      - name: Build agent exe
+        run: pyinstaller --clean installer/pc-monitor-agent.spec
+      - name: Assemble portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/PCMonitorPortable | Out-Null
+          Copy-Item dist/PCMonitorAgent.exe dist/PCMonitorPortable/
+          Copy-Item installer/run_portable.bat dist/PCMonitorPortable/
+          Copy-Item README.md dist/PCMonitorPortable/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PCMonitor-Windows
+          path: dist/PCMonitorPortable
